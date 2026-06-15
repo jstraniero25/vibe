@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AlphaSense Podcast</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #22263a;
+      --accent: #6c63ff;
+      --accent2: #a78bfa;
+      --text: #e8eaf6;
+      --muted: #8b8fa8;
+      --border: #2e3250;
+      --success: #4ade80;
+      --error: #f87171;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px 80px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 48px;
+    }
+
+    header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 8px;
+    }
+
+    header p {
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+      width: 100%;
+      max-width: 680px;
+      margin-bottom: 20px;
+    }
+
+    .card h2 {
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+
+    label { display: block; margin-bottom: 6px; font-size: 0.9rem; color: var(--muted); }
+
+    input[type="password"], input[type="text"] {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 0.95rem;
+      padding: 12px 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input:focus { border-color: var(--accent); }
+
+    .key-hint {
+      margin-top: 8px;
+      font-size: 0.78rem;
+      color: var(--muted);
+    }
+    .key-hint a { color: var(--accent2); text-decoration: none; }
+    .key-hint a:hover { text-decoration: underline; }
+
+    /* Drop zone */
+    #drop-zone {
+      border: 2px dashed var(--border);
+      border-radius: 12px;
+      padding: 40px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    #drop-zone.dragover {
+      border-color: var(--accent);
+      background: rgba(108, 99, 255, 0.06);
+    }
+    #drop-zone .icon { font-size: 2.5rem; margin-bottom: 12px; }
+    #drop-zone p { color: var(--muted); font-size: 0.9rem; }
+    #drop-zone strong { color: var(--text); }
+    #file-input { display: none; }
+
+    #file-name {
+      margin-top: 12px;
+      font-size: 0.85rem;
+      color: var(--success);
+      display: none;
+    }
+
+    /* Buttons */
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 12px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff;
+    }
+
+    /* Status */
+    #status {
+      max-width: 680px;
+      width: 100%;
+      font-size: 0.88rem;
+      color: var(--muted);
+      text-align: center;
+      min-height: 24px;
+      margin-bottom: 8px;
+    }
+    #status.error { color: var(--error); }
+
+    /* Player */
+    #player-card { display: none; }
+
+    .script-box {
+      background: var(--surface2);
+      border-radius: 10px;
+      padding: 18px;
+      max-height: 240px;
+      overflow-y: auto;
+      font-size: 0.9rem;
+      line-height: 1.65;
+      color: var(--muted);
+      margin-bottom: 20px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    /* Controls */
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .ctrl-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 50%;
+      width: 48px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 1.2rem;
+      flex-shrink: 0;
+      transition: background 0.15s;
+    }
+    .ctrl-btn:hover { background: var(--border); }
+    .ctrl-btn.play-pause {
+      width: 56px;
+      height: 56px;
+      font-size: 1.5rem;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border: none;
+    }
+    .ctrl-btn.play-pause:hover { opacity: 0.9; }
+
+    .progress-wrap {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .progress-bar-bg {
+      background: var(--surface2);
+      border-radius: 99px;
+      height: 6px;
+      cursor: pointer;
+      position: relative;
+    }
+
+    #progress-fill {
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      height: 100%;
+      border-radius: 99px;
+      width: 0%;
+      transition: width 0.4s linear;
+      pointer-events: none;
+    }
+
+    .time-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    /* Rate */
+    .rate-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .rate-row label { font-size: 0.85rem; color: var(--muted); white-space: nowrap; }
+    input[type="range"] {
+      flex: 1;
+      accent-color: var(--accent);
+    }
+    #rate-display { font-size: 0.85rem; color: var(--accent2); min-width: 36px; }
+
+    /* Download */
+    .btn-outline {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 10px 16px;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+    .btn-outline:hover { border-color: var(--accent2); }
+
+    /* Word highlight */
+    .word { transition: color 0.1s; }
+    .word.active { color: var(--accent2); font-weight: 600; }
+
+    /* Scrollbar */
+    .script-box::-webkit-scrollbar { width: 6px; }
+    .script-box::-webkit-scrollbar-track { background: transparent; }
+    .script-box::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🎙 AlphaSense Podcast</h1>
+  <p>Drop in your Deep Research PDF — get a listenable analyst briefing.</p>
+</header>
+
+<!-- Step 1: API Key -->
+<div class="card">
+  <h2>Step 1 — Anthropic API Key</h2>
+  <label for="api-key">Your key is never stored on any server</label>
+  <input type="password" id="api-key" placeholder="sk-ant-..." />
+  <p class="key-hint">
+    Get a free key at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a>
+  </p>
+</div>
+
+<!-- Step 2: Upload -->
+<div class="card">
+  <h2>Step 2 — Upload AlphaSense PDF</h2>
+  <div id="drop-zone">
+    <div class="icon">📄</div>
+    <p><strong>Drop your PDF here</strong> or click to browse</p>
+    <p>10–15 page Deep Research reports work best</p>
+  </div>
+  <input type="file" id="file-input" accept=".pdf" />
+  <div id="file-name"></div>
+</div>
+
+<!-- Generate -->
+<div style="width:100%;max-width:680px;margin-bottom:20px;">
+  <div id="status"></div>
+  <button class="btn btn-primary" id="generate-btn" disabled>
+    <span>✨</span> Generate Podcast Script
+  </button>
+</div>
+
+<!-- Player -->
+<div class="card" id="player-card">
+  <h2>Your Podcast</h2>
+  <div class="script-box" id="script-display"></div>
+
+  <div class="rate-row">
+    <label>Speed</label>
+    <input type="range" id="rate-slider" min="0.7" max="1.5" step="0.05" value="1.0" />
+    <span id="rate-display">1.0×</span>
+  </div>
+
+  <div class="controls">
+    <button class="ctrl-btn" id="restart-btn" title="Restart">⏮</button>
+    <button class="ctrl-btn play-pause" id="play-btn">▶</button>
+    <button class="ctrl-btn" id="stop-btn" title="Stop">⏹</button>
+    <div class="progress-wrap">
+      <div class="progress-bar-bg" id="progress-bar">
+        <div id="progress-fill"></div>
+      </div>
+      <div class="time-row">
+        <span id="time-elapsed">0:00</span>
+        <span id="time-total">--:--</span>
+      </div>
+    </div>
+  </div>
+
+  <button class="btn-outline" id="copy-btn">📋 Copy Script</button>
+</div>
+
+<script>
+  // ── State ────────────────────────────────────────────────────────────────
+  let pdfText = "";
+  let fullScript = "";
+  let utterance = null;
+  let words = [];
+  let wordIndex = 0;
+  let isPlaying = false;
+  let startTime = null;
+  let elapsedBeforePause = 0;
+  let timerInterval = null;
+  let estimatedDuration = 0; // seconds
+
+  // ── Elements ─────────────────────────────────────────────────────────────
+  const apiKeyEl = document.getElementById("api-key");
+  const dropZone = document.getElementById("drop-zone");
+  const fileInput = document.getElementById("file-input");
+  const fileNameEl = document.getElementById("file-name");
+  const generateBtn = document.getElementById("generate-btn");
+  const statusEl = document.getElementById("status");
+  const playerCard = document.getElementById("player-card");
+  const scriptDisplay = document.getElementById("script-display");
+  const playBtn = document.getElementById("play-btn");
+  const restartBtn = document.getElementById("restart-btn");
+  const stopBtn = document.getElementById("stop-btn");
+  const rateSlider = document.getElementById("rate-slider");
+  const rateDisplay = document.getElementById("rate-display");
+  const progressFill = document.getElementById("progress-fill");
+  const progressBar = document.getElementById("progress-bar");
+  const timeElapsed = document.getElementById("time-elapsed");
+  const timeTotal = document.getElementById("time-total");
+  const copyBtn = document.getElementById("copy-btn");
+
+  // Restore API key
+  const savedKey = localStorage.getItem("anthropic_key");
+  if (savedKey) apiKeyEl.value = savedKey;
+  apiKeyEl.addEventListener("input", () => {
+    localStorage.setItem("anthropic_key", apiKeyEl.value.trim());
+    checkReady();
+  });
+
+  // ── File drop / browse ────────────────────────────────────────────────────
+  dropZone.addEventListener("click", () => fileInput.click());
+  dropZone.addEventListener("dragover", e => { e.preventDefault(); dropZone.classList.add("dragover"); });
+  dropZone.addEventListener("dragleave", () => dropZone.classList.remove("dragover"));
+  dropZone.addEventListener("drop", e => {
+    e.preventDefault();
+    dropZone.classList.remove("dragover");
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  });
+  fileInput.addEventListener("change", () => {
+    if (fileInput.files[0]) handleFile(fileInput.files[0]);
+  });
+
+  function handleFile(file) {
+    if (!file.name.toLowerCase().endsWith(".pdf")) {
+      setStatus("Please upload a PDF file.", true);
+      return;
+    }
+    fileNameEl.textContent = `📄 ${file.name}`;
+    fileNameEl.style.display = "block";
+    // Store file reference for upload
+    handleFile._file = file;
+    checkReady();
+  }
+
+  function checkReady() {
+    const hasKey = apiKeyEl.value.trim().startsWith("sk-");
+    const hasFile = !!handleFile._file;
+    generateBtn.disabled = !(hasKey && hasFile);
+  }
+
+  // ── Generate ──────────────────────────────────────────────────────────────
+  generateBtn.addEventListener("click", async () => {
+    const file = handleFile._file;
+    const apiKey = apiKeyEl.value.trim();
+    if (!file || !apiKey) return;
+
+    generateBtn.disabled = true;
+    setStatus("Extracting text from PDF…");
+
+    // 1. Extract
+    const formData = new FormData();
+    formData.append("file", file);
+    let extractRes;
+    try {
+      extractRes = await fetch("/extract", { method: "POST", body: formData });
+    } catch {
+      setStatus("Server not reachable. Is the Flask app running?", true);
+      generateBtn.disabled = false;
+      return;
+    }
+    const extractData = await extractRes.json();
+    if (extractData.error) {
+      setStatus(extractData.error, true);
+      generateBtn.disabled = false;
+      return;
+    }
+    pdfText = extractData.text;
+    setStatus(`Extracted ${extractData.pages} pages. Generating podcast script with Claude… (this takes ~30s)`);
+
+    // 2. Generate script
+    let genRes;
+    try {
+      genRes = await fetch("/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ api_key: apiKey, text: pdfText }),
+      });
+    } catch {
+      setStatus("Server error during generation.", true);
+      generateBtn.disabled = false;
+      return;
+    }
+    const genData = await genRes.json();
+    if (genData.error) {
+      setStatus(genData.error, true);
+      generateBtn.disabled = false;
+      return;
+    }
+
+    fullScript = genData.script;
+    setStatus("Script ready! Hit play to listen.");
+    showPlayer(fullScript);
+    generateBtn.disabled = false;
+  });
+
+  // ── Player ────────────────────────────────────────────────────────────────
+  function showPlayer(script) {
+    playerCard.style.display = "block";
+    playerCard.scrollIntoView({ behavior: "smooth" });
+
+    // Build word-span HTML
+    words = script.split(/(\s+)/);
+    let html = "";
+    let wIdx = 0;
+    for (let i = 0; i < words.length; i++) {
+      if (/\S/.test(words[i])) {
+        html += `<span class="word" data-w="${wIdx++}">${esc(words[i])}</span>`;
+      } else {
+        html += esc(words[i]);
+      }
+    }
+    scriptDisplay.innerHTML = html;
+
+    // Estimate duration: word count / (rate * 220 wpm) in seconds
+    const wordCount = script.split(/\s+/).length;
+    const rate = parseFloat(rateSlider.value);
+    estimatedDuration = Math.round(wordCount / (rate * 220) * 60);
+    timeTotal.textContent = fmt(estimatedDuration);
+  }
+
+  function esc(s) {
+    return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  }
+
+  // Rate slider
+  rateSlider.addEventListener("input", () => {
+    rateDisplay.textContent = parseFloat(rateSlider.value).toFixed(2) + "×";
+    if (utterance) utterance.rate = parseFloat(rateSlider.value);
+    // Recalculate duration
+    const wordCount = fullScript.split(/\s+/).length;
+    estimatedDuration = Math.round(wordCount / (parseFloat(rateSlider.value) * 220) * 60);
+    timeTotal.textContent = fmt(estimatedDuration);
+  });
+
+  // Play / Pause
+  playBtn.addEventListener("click", () => {
+    if (!fullScript) return;
+    if (isPlaying) {
+      speechSynthesis.pause();
+      pauseTimer();
+      isPlaying = false;
+      playBtn.textContent = "▶";
+    } else {
+      if (utterance && speechSynthesis.paused) {
+        speechSynthesis.resume();
+        resumeTimer();
+        isPlaying = true;
+        playBtn.textContent = "⏸";
+      } else {
+        startSpeech();
+      }
+    }
+  });
+
+  restartBtn.addEventListener("click", () => {
+    stopSpeech();
+    setTimeout(() => startSpeech(), 100);
+  });
+
+  stopBtn.addEventListener("click", () => {
+    stopSpeech();
+    setProgress(0);
+    timeElapsed.textContent = "0:00";
+  });
+
+  progressBar.addEventListener("click", e => {
+    if (!utterance) return;
+    const pct = e.offsetX / progressBar.offsetWidth;
+    const targetSec = pct * estimatedDuration;
+    elapsedBeforePause = targetSec;
+    setProgress(pct * 100);
+    // Unfortunately Web Speech API doesn't support seeking; restart from closest chunk
+    // We find the approximate word index and restart from there
+    const targetWord = Math.round(pct * words.filter(w => /\S/.test(w)).length);
+    restartFromWord(targetWord);
+  });
+
+  function startSpeech(fromWordIndex = 0) {
+    speechSynthesis.cancel();
+    clearInterval(timerInterval);
+    isPlaying = true;
+    playBtn.textContent = "⏸";
+    wordIndex = fromWordIndex;
+
+    const remainingWords = words.filter(w => /\S/.test(w)).slice(fromWordIndex).join(" ");
+    utterance = new SpeechSynthesisUtterance(remainingWords);
+    utterance.rate = parseFloat(rateSlider.value);
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+
+    // Pick a good voice if available
+    const voices = speechSynthesis.getVoices();
+    const preferred = voices.find(v =>
+      /Google US English|Samantha|Alex|Daniel|Karen/.test(v.name) && v.lang.startsWith("en")
+    ) || voices.find(v => v.lang.startsWith("en-US") && !v.localService === false)
+      || voices.find(v => v.lang.startsWith("en"));
+    if (preferred) utterance.voice = preferred;
+
+    utterance.onboundary = e => {
+      if (e.name !== "word") return;
+      const charIndex = e.charIndex;
+      const spokenSoFar = remainingWords.slice(0, charIndex + 1).split(/\s+/).length - 1;
+      const absIdx = fromWordIndex + spokenSoFar;
+      highlightWord(absIdx);
+      const pct = (absIdx / words.filter(w => /\S/.test(w)).length) * 100;
+      setProgress(pct);
+    };
+
+    utterance.onend = () => {
+      isPlaying = false;
+      playBtn.textContent = "▶";
+      setProgress(100);
+      stopTimer();
+      highlightWord(-1);
+    };
+
+    utterance.onerror = e => {
+      if (e.error !== "interrupted") {
+        setStatus("Speech error: " + e.error, true);
+        isPlaying = false;
+        playBtn.textContent = "▶";
+        stopTimer();
+      }
+    };
+
+    startTime = Date.now() - (elapsedBeforePause * 1000);
+    speechSynthesis.speak(utterance);
+    startTimer();
+  }
+
+  function restartFromWord(wordIdx) {
+    stopSpeech();
+    setTimeout(() => startSpeech(wordIdx), 100);
+  }
+
+  function stopSpeech() {
+    speechSynthesis.cancel();
+    isPlaying = false;
+    playBtn.textContent = "▶";
+    elapsedBeforePause = 0;
+    stopTimer();
+    highlightWord(-1);
+  }
+
+  function highlightWord(idx) {
+    document.querySelectorAll(".word.active").forEach(el => el.classList.remove("active"));
+    if (idx >= 0) {
+      const el = scriptDisplay.querySelector(`[data-w="${idx}"]`);
+      if (el) {
+        el.classList.add("active");
+        el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      }
+    }
+  }
+
+  function setProgress(pct) {
+    progressFill.style.width = Math.min(100, pct) + "%";
+  }
+
+  // Timer
+  function startTimer() {
+    clearInterval(timerInterval);
+    timerInterval = setInterval(updateTimer, 500);
+  }
+  function pauseTimer() {
+    elapsedBeforePause = (Date.now() - startTime) / 1000;
+    clearInterval(timerInterval);
+  }
+  function resumeTimer() {
+    startTime = Date.now() - (elapsedBeforePause * 1000);
+    startTimer();
+  }
+  function stopTimer() {
+    clearInterval(timerInterval);
+    elapsedBeforePause = 0;
+  }
+  function updateTimer() {
+    const elapsed = Math.min((Date.now() - startTime) / 1000, estimatedDuration);
+    timeElapsed.textContent = fmt(elapsed);
+    const pct = (elapsed / estimatedDuration) * 100;
+    setProgress(pct);
+  }
+  function fmt(sec) {
+    const s = Math.round(sec);
+    return `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`;
+  }
+
+  // Copy
+  copyBtn.addEventListener("click", async () => {
+    await navigator.clipboard.writeText(fullScript);
+    copyBtn.textContent = "✅ Copied!";
+    setTimeout(() => copyBtn.textContent = "📋 Copy Script", 2000);
+  });
+
+  // Status helper
+  function setStatus(msg, isError = false) {
+    statusEl.textContent = msg;
+    statusEl.className = isError ? "error" : "";
+  }
+
+  // Init voices (Chrome needs this)
+  speechSynthesis.onvoiceschanged = () => speechSynthesis.getVoices();
+</script>
+</body>
+</html>
