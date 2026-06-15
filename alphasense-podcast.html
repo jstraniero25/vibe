@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AlphaSense Podcast Player</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs" type="module"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #22263a;
+      --accent: #6c63ff;
+      --accent2: #a78bfa;
+      --text: #e8eaf6;
+      --muted: #8b8fa8;
+      --border: #2e3250;
+      --success: #4ade80;
+      --error: #f87171;
+      --warn: #fbbf24;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px 80px;
+    }
+
+    header { text-align: center; margin-bottom: 44px; }
+    header h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 8px;
+    }
+    header p { color: var(--muted); font-size: 0.95rem; }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+      width: 100%;
+      max-width: 700px;
+      margin-bottom: 20px;
+    }
+    .card-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+      margin-bottom: 16px;
+    }
+
+    /* Drop zone */
+    #drop-zone {
+      border: 2px dashed var(--border);
+      border-radius: 14px;
+      padding: 52px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      user-select: none;
+    }
+    #drop-zone.dragover {
+      border-color: var(--accent);
+      background: rgba(108,99,255,0.07);
+    }
+    #drop-zone.has-file {
+      border-color: var(--success);
+      background: rgba(74,222,128,0.04);
+    }
+    .drop-icon { font-size: 3rem; margin-bottom: 14px; }
+    #drop-label { font-size: 1.05rem; color: var(--text); font-weight: 600; margin-bottom: 6px; }
+    #drop-sub { font-size: 0.88rem; color: var(--muted); }
+    #file-input { display: none; }
+
+    /* Status bar */
+    #status-bar {
+      max-width: 700px;
+      width: 100%;
+      min-height: 28px;
+      font-size: 0.88rem;
+      text-align: center;
+      color: var(--muted);
+      margin-bottom: 8px;
+      padding: 0 4px;
+    }
+    #status-bar.error { color: var(--error); }
+    #status-bar.warn  { color: var(--warn); }
+    #status-bar.ok    { color: var(--success); }
+
+    /* Progress */
+    #extract-progress {
+      max-width: 700px;
+      width: 100%;
+      margin-bottom: 16px;
+      display: none;
+    }
+    .bar-bg {
+      background: var(--surface);
+      border-radius: 99px;
+      height: 6px;
+      overflow: hidden;
+    }
+    #extract-fill {
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      height: 100%;
+      width: 0%;
+      transition: width 0.3s;
+      border-radius: 99px;
+    }
+
+    /* Player card */
+    #player-card { display: none; }
+
+    /* Controls */
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 22px;
+    }
+    .ctrl-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 50%;
+      width: 46px; height: 46px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+      font-size: 1.1rem;
+      flex-shrink: 0;
+      transition: background 0.15s;
+    }
+    .ctrl-btn:hover { background: var(--border); }
+    .ctrl-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+    #play-btn {
+      width: 60px; height: 60px;
+      font-size: 1.6rem;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border: none;
+      border-radius: 50%;
+    }
+    #play-btn:hover { opacity: 0.88; }
+
+    .progress-wrap { flex: 1; }
+    .prog-bar-bg {
+      background: var(--surface2);
+      border-radius: 99px;
+      height: 7px;
+      cursor: pointer;
+      margin-bottom: 7px;
+      position: relative;
+    }
+    #prog-fill {
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      height: 100%;
+      border-radius: 99px;
+      width: 0%;
+      pointer-events: none;
+    }
+    .time-row {
+      display: flex; justify-content: space-between;
+      font-size: 0.75rem; color: var(--muted);
+    }
+
+    /* Rate & voice */
+    .option-row {
+      display: flex; align-items: center; gap: 12px;
+      margin-bottom: 16px;
+    }
+    .option-row label { font-size: 0.85rem; color: var(--muted); white-space: nowrap; min-width: 52px; }
+    input[type="range"] { flex: 1; accent-color: var(--accent); }
+    .opt-val { font-size: 0.85rem; color: var(--accent2); min-width: 38px; }
+    select {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 7px 10px;
+      font-size: 0.85rem;
+      outline: none;
+    }
+
+    /* Script viewer */
+    .script-box {
+      background: var(--surface2);
+      border-radius: 10px;
+      padding: 16px 18px;
+      max-height: 220px;
+      overflow-y: auto;
+      font-size: 0.88rem;
+      line-height: 1.7;
+      color: var(--muted);
+      margin-bottom: 20px;
+      word-break: break-word;
+    }
+    .script-box::-webkit-scrollbar { width: 5px; }
+    .script-box::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    .word { transition: color 0.08s; }
+    .word.active { color: var(--accent2); font-weight: 600; }
+
+    /* Bottom actions */
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+    .btn-sm {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 9px 16px;
+      border-radius: 9px;
+      font-size: 0.83rem;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    .btn-sm:hover { border-color: var(--accent2); }
+
+    /* Tips */
+    .tip {
+      max-width: 700px;
+      width: 100%;
+      background: rgba(108,99,255,0.08);
+      border: 1px solid rgba(108,99,255,0.25);
+      border-radius: 12px;
+      padding: 14px 18px;
+      font-size: 0.82rem;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+    .tip strong { color: var(--accent2); }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🎙 AlphaSense Podcast Player</h1>
+  <p>Drop your Deep Research PDF — press play — listen.</p>
+</header>
+
+<!-- Drop zone -->
+<div class="card">
+  <div class="card-label">Drop your PDF here</div>
+  <div id="drop-zone">
+    <div class="drop-icon">📄</div>
+    <div id="drop-label">Drag & drop your AlphaSense PDF</div>
+    <div id="drop-sub">or click to browse your files</div>
+  </div>
+  <input type="file" id="file-input" accept=".pdf" />
+</div>
+
+<div id="extract-progress">
+  <div class="bar-bg"><div id="extract-fill"></div></div>
+</div>
+
+<div id="status-bar"></div>
+
+<!-- Player -->
+<div class="card" id="player-card">
+  <div class="card-label">Now Playing</div>
+
+  <div class="script-box" id="script-display">Loading…</div>
+
+  <div class="option-row">
+    <label>Speed</label>
+    <input type="range" id="rate-slider" min="0.6" max="1.6" step="0.05" value="0.95" />
+    <span class="opt-val" id="rate-val">0.95×</span>
+  </div>
+
+  <div class="option-row">
+    <label>Voice</label>
+    <select id="voice-select"><option value="">Default</option></select>
+  </div>
+
+  <div class="controls">
+    <button class="ctrl-btn" id="restart-btn" title="Restart from beginning">⏮</button>
+    <button class="ctrl-btn" id="back-btn" title="Back 30 seconds">↺</button>
+    <button class="ctrl-btn" id="play-btn">▶</button>
+    <button class="ctrl-btn" id="fwd-btn" title="Forward 30 seconds">↻</button>
+    <button class="ctrl-btn" id="stop-btn" title="Stop">⏹</button>
+    <div class="progress-wrap">
+      <div class="prog-bar-bg" id="prog-bar">
+        <div id="prog-fill"></div>
+      </div>
+      <div class="time-row">
+        <span id="t-elapsed">0:00</span>
+        <span id="t-total">--:--</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn-sm" id="copy-btn">📋 Copy text</button>
+    <button class="btn-sm" id="new-btn">📄 Load new PDF</button>
+  </div>
+</div>
+
+<br />
+<div class="tip">
+  <strong>Tip:</strong> Works best in <strong>Chrome</strong> or <strong>Edge</strong> on a Mac or Windows PC — those browsers have the most natural-sounding voices.
+  On Mac, "Samantha" and "Karen" sound great. On Windows try "Microsoft Aria" or "Microsoft Guy".
+</div>
+
+<script type="module">
+  // ── PDF.js setup ─────────────────────────────────────────────────────────
+  const { getDocument, GlobalWorkerOptions } = await import(
+    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs"
+  );
+  GlobalWorkerOptions.workerSrc =
+    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs";
+
+  // ── Elements ──────────────────────────────────────────────────────────────
+  const dropZone      = document.getElementById("drop-zone");
+  const fileInput     = document.getElementById("file-input");
+  const dropLabel     = document.getElementById("drop-label");
+  const dropSub       = document.getElementById("drop-sub");
+  const statusBar     = document.getElementById("status-bar");
+  const extractProg   = document.getElementById("extract-progress");
+  const extractFill   = document.getElementById("extract-fill");
+  const playerCard    = document.getElementById("player-card");
+  const scriptDisplay = document.getElementById("script-display");
+  const playBtn       = document.getElementById("play-btn");
+  const restartBtn    = document.getElementById("restart-btn");
+  const backBtn       = document.getElementById("back-btn");
+  const fwdBtn        = document.getElementById("fwd-btn");
+  const stopBtn       = document.getElementById("stop-btn");
+  const rateSlider    = document.getElementById("rate-slider");
+  const rateVal       = document.getElementById("rate-val");
+  const voiceSelect   = document.getElementById("voice-select");
+  const progBar       = document.getElementById("prog-bar");
+  const progFill      = document.getElementById("prog-fill");
+  const tElapsed      = document.getElementById("t-elapsed");
+  const tTotal        = document.getElementById("t-total");
+  const copyBtn       = document.getElementById("copy-btn");
+  const newBtn        = document.getElementById("new-btn");
+
+  // ── State ─────────────────────────────────────────────────────────────────
+  let rawText      = "";
+  let wordTokens   = [];   // array of word strings (non-whitespace)
+  let chunkStarts  = [];   // word index where each chunk starts
+  let chunks       = [];   // text chunks fed to SpeechSynthesisUtterance one at a time
+  let currentChunk = 0;
+  let wordOffset   = 0;    // global word index at start of currentChunk
+  let currentWordInChunk = 0;
+  let isPlaying    = false;
+  let utterance    = null;
+  let elapsedSec   = 0;
+  let startMs      = null;
+  let timerID      = null;
+  let estDuration  = 0;
+  let voices       = [];
+
+  // ── Voices ────────────────────────────────────────────────────────────────
+  function loadVoices() {
+    voices = speechSynthesis.getVoices().filter(v => v.lang.startsWith("en"));
+    voiceSelect.innerHTML = '<option value="">Default (browser picks)</option>';
+    // Sort: prefer natural-sounding ones first
+    const preferred = ["Samantha","Karen","Daniel","Moira","Aria","Guy","Zira","David","Alice"];
+    voices.sort((a, b) => {
+      const ai = preferred.findIndex(p => a.name.includes(p));
+      const bi = preferred.findIndex(p => b.name.includes(p));
+      if (ai === -1 && bi === -1) return 0;
+      if (ai === -1) return 1;
+      if (bi === -1) return -1;
+      return ai - bi;
+    });
+    voices.forEach((v, i) => {
+      const opt = document.createElement("option");
+      opt.value = i;
+      opt.textContent = `${v.name} (${v.lang})`;
+      voiceSelect.appendChild(opt);
+    });
+    // Auto-select a good default
+    const bestIdx = voices.findIndex(v =>
+      /Samantha|Aria|Karen|Daniel|Guy/.test(v.name)
+    );
+    if (bestIdx >= 0) voiceSelect.value = bestIdx;
+  }
+  speechSynthesis.onvoiceschanged = loadVoices;
+  loadVoices();
+
+  // ── Drop / browse ─────────────────────────────────────────────────────────
+  dropZone.addEventListener("click", () => fileInput.click());
+  dropZone.addEventListener("dragover", e => {
+    e.preventDefault();
+    dropZone.classList.add("dragover");
+  });
+  dropZone.addEventListener("dragleave", () => dropZone.classList.remove("dragover"));
+  dropZone.addEventListener("drop", e => {
+    e.preventDefault();
+    dropZone.classList.remove("dragover");
+    if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener("change", () => {
+    if (fileInput.files[0]) handleFile(fileInput.files[0]);
+  });
+
+  newBtn.addEventListener("click", () => {
+    stopSpeech();
+    playerCard.style.display = "none";
+    dropZone.classList.remove("has-file");
+    dropLabel.textContent = "Drag & drop your AlphaSense PDF";
+    dropSub.textContent = "or click to browse your files";
+    setStatus("");
+    fileInput.value = "";
+  });
+
+  // ── PDF extraction ────────────────────────────────────────────────────────
+  async function handleFile(file) {
+    if (!file.name.toLowerCase().endsWith(".pdf")) {
+      setStatus("Please drop a PDF file.", "error");
+      return;
+    }
+
+    stopSpeech();
+    playerCard.style.display = "none";
+    dropZone.classList.add("has-file");
+    dropLabel.textContent = "✅ " + file.name;
+    dropSub.textContent = "Extracting text…";
+    setStatus("Reading PDF…");
+    extractProg.style.display = "block";
+    extractFill.style.width = "5%";
+
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await getDocument({ data: arrayBuffer }).promise;
+      const totalPages = pdf.numPages;
+      let parts = [];
+
+      for (let p = 1; p <= totalPages; p++) {
+        const page = await pdf.getPage(p);
+        const content = await page.getTextContent();
+        const pageText = content.items
+          .map(item => item.str)
+          .join(" ")
+          .replace(/\s+/g, " ")
+          .trim();
+        if (pageText) parts.push(pageText);
+        extractFill.style.width = Math.round((p / totalPages) * 100) + "%";
+      }
+
+      extractFill.style.width = "100%";
+      setTimeout(() => { extractProg.style.display = "none"; }, 600);
+
+      rawText = cleanText(parts.join("\n\n"));
+      if (!rawText.trim()) {
+        setStatus("Couldn't extract text — this PDF may be scanned/image-based.", "error");
+        return;
+      }
+
+      const wordCount = rawText.split(/\s+/).length;
+      const rate = parseFloat(rateSlider.value);
+      estDuration = Math.round(wordCount / (rate * 200) * 60);
+
+      setStatus(`Extracted ${totalPages} pages · ${wordCount.toLocaleString()} words · ~${fmt(estDuration)} at current speed`, "ok");
+      dropSub.textContent = `${totalPages} pages extracted`;
+      buildPlayer(rawText);
+
+    } catch (err) {
+      extractProg.style.display = "none";
+      setStatus("Error reading PDF: " + err.message, "error");
+    }
+  }
+
+  // ── Text cleanup ─────────────────────────────────────────────────────────
+  function cleanText(text) {
+    return text
+      // Remove common PDF noise
+      .replace(/\f/g, "\n")                          // form feeds
+      .replace(/(\r\n|\r)/g, "\n")
+      .replace(/[ \t]+/g, " ")                       // collapse spaces
+      .replace(/\n{3,}/g, "\n\n")                    // max 2 newlines
+      // Remove page numbers (lone numbers on a line)
+      .replace(/^\s*\d{1,3}\s*$/gm, "")
+      // Remove common header/footer noise
+      .replace(/^(page \d+|confidential|proprietary|alphasense.*?)\n/gim, "")
+      // Expand % for speech
+      .replace(/(\d+(?:\.\d+)?)\s*%/g, (_, n) => n + " percent")
+      // Expand $ amounts
+      .replace(/\$(\d[\d,]*(?:\.\d+)?)\s*(billion|million|trillion|thousand)?/gi,
+        (_, n, unit) => n.replace(/,/g, "") + " dollars" + (unit ? " " + unit : ""))
+      // Expand common financial abbreviations
+      .replace(/\bQ([1-4])\b/g, "quarter $1")
+      .replace(/\bFY(\d{2,4})\b/g, "fiscal year $1")
+      .replace(/\bYoY\b/gi, "year over year")
+      .replace(/\bQoQ\b/gi, "quarter over quarter")
+      .replace(/\bEBITDA\b/g, "EBITDA")
+      .replace(/\bEPS\b/g, "earnings per share")
+      .replace(/\bP\/E\b/g, "price to earnings")
+      .replace(/\bM&A\b/g, "mergers and acquisitions")
+      .replace(/\bIPO\b/g, "I P O")
+      .replace(/\bCEO\b/g, "C E O")
+      .replace(/\bCFO\b/g, "C F O")
+      .replace(/\bCOO\b/g, "C O O")
+      .trim();
+  }
+
+  // ── Build player ──────────────────────────────────────────────────────────
+  function buildPlayer(text) {
+    // Tokenize into words (preserving spaces)
+    // We'll display word spans for highlighting
+    const tokens = text.split(/(\s+)/);
+    wordTokens = [];
+    let html = "";
+    let wIdx = 0;
+    for (const tok of tokens) {
+      if (/\S/.test(tok)) {
+        html += `<span class="word" data-w="${wIdx}">${escHtml(tok)}</span>`;
+        wordTokens.push(tok);
+        wIdx++;
+      } else {
+        html += escHtml(tok);
+      }
+    }
+    scriptDisplay.innerHTML = html;
+
+    // Split into ~200-word chunks for reliable speech synthesis
+    // (long utterances can stall or get cut off in some browsers)
+    chunks = [];
+    chunkStarts = [];
+    const CHUNK = 200;
+    for (let i = 0; i < wordTokens.length; i += CHUNK) {
+      chunkStarts.push(i);
+      chunks.push(wordTokens.slice(i, i + CHUNK).join(" "));
+    }
+
+    currentChunk = 0;
+    wordOffset = 0;
+    elapsedSec = 0;
+    tElapsed.textContent = "0:00";
+    tTotal.textContent = fmt(estDuration);
+    progFill.style.width = "0%";
+
+    playerCard.style.display = "block";
+    playerCard.scrollIntoView({ behavior: "smooth" });
+  }
+
+  // ── Speech ────────────────────────────────────────────────────────────────
+  function getSelectedVoice() {
+    const idx = voiceSelect.value;
+    if (idx === "" || voices.length === 0) return null;
+    return voices[parseInt(idx)] || null;
+  }
+
+  function speakChunk(chunkIdx) {
+    if (chunkIdx >= chunks.length) {
+      // Done
+      isPlaying = false;
+      playBtn.textContent = "▶";
+      progFill.style.width = "100%";
+      tElapsed.textContent = fmt(estDuration);
+      stopTimer();
+      highlightWord(-1);
+      return;
+    }
+
+    currentChunk = chunkIdx;
+    wordOffset = chunkStarts[chunkIdx];
+
+    utterance = new SpeechSynthesisUtterance(chunks[chunkIdx]);
+    utterance.rate  = parseFloat(rateSlider.value);
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+    const voice = getSelectedVoice();
+    if (voice) utterance.voice = voice;
+
+    utterance.onboundary = e => {
+      if (e.name !== "word") return;
+      // Calculate which word in this chunk based on charIndex
+      const spokenText = chunks[chunkIdx].slice(0, e.charIndex);
+      const wordsSpoken = spokenText.split(/\s+/).filter(Boolean).length;
+      const globalIdx = wordOffset + wordsSpoken;
+      currentWordInChunk = wordsSpoken;
+      highlightWord(globalIdx);
+      // Update progress
+      const pct = (globalIdx / wordTokens.length) * 100;
+      progFill.style.width = pct + "%";
+    };
+
+    utterance.onend = () => {
+      if (!isPlaying) return;
+      speakChunk(chunkIdx + 1);
+    };
+
+    utterance.onerror = e => {
+      if (e.error === "interrupted" || e.error === "canceled") return;
+      // On error, try next chunk
+      if (isPlaying) speakChunk(chunkIdx + 1);
+    };
+
+    speechSynthesis.speak(utterance);
+  }
+
+  function startSpeech(fromChunk = 0) {
+    speechSynthesis.cancel();
+    isPlaying = true;
+    playBtn.textContent = "⏸";
+    currentChunk = fromChunk;
+    wordOffset = chunkStarts[fromChunk] || 0;
+    speakChunk(fromChunk);
+    resumeTimer();
+  }
+
+  function stopSpeech() {
+    speechSynthesis.cancel();
+    isPlaying = false;
+    playBtn.textContent = "▶";
+    stopTimer();
+    highlightWord(-1);
+  }
+
+  function pauseSpeech() {
+    speechSynthesis.pause();
+    isPlaying = false;
+    playBtn.textContent = "▶";
+    pauseTimer();
+  }
+
+  function resumeSpeech() {
+    // Some browsers don't resume reliably — restart current chunk instead
+    speechSynthesis.cancel();
+    isPlaying = true;
+    playBtn.textContent = "⏸";
+    speakChunk(currentChunk);
+    resumeTimer();
+  }
+
+  // ── Controls ──────────────────────────────────────────────────────────────
+  playBtn.addEventListener("click", () => {
+    if (!chunks.length) return;
+    if (isPlaying) {
+      pauseSpeech();
+    } else {
+      if (currentChunk >= chunks.length) {
+        // Restart from beginning
+        elapsedSec = 0;
+        currentChunk = 0;
+      }
+      startSpeech(currentChunk);
+    }
+  });
+
+  restartBtn.addEventListener("click", () => {
+    stopSpeech();
+    elapsedSec = 0;
+    currentChunk = 0;
+    progFill.style.width = "0%";
+    tElapsed.textContent = "0:00";
+    highlightWord(-1);
+    startSpeech(0);
+  });
+
+  stopBtn.addEventListener("click", () => {
+    stopSpeech();
+    elapsedSec = 0;
+    currentChunk = 0;
+    progFill.style.width = "0%";
+    tElapsed.textContent = "0:00";
+  });
+
+  // Back/Forward ~30 seconds ≈ 100 words at 200wpm
+  const SKIP_WORDS = 100;
+
+  backBtn.addEventListener("click", () => {
+    const wasPlaying = isPlaying;
+    stopSpeech();
+    const targetWord = Math.max(0, (chunkStarts[currentChunk] || 0) - SKIP_WORDS);
+    seekToWord(targetWord);
+    if (wasPlaying) startSpeech(currentChunk);
+  });
+
+  fwdBtn.addEventListener("click", () => {
+    const wasPlaying = isPlaying;
+    stopSpeech();
+    const targetWord = Math.min(wordTokens.length - 1, (chunkStarts[currentChunk] || 0) + SKIP_WORDS);
+    seekToWord(targetWord);
+    if (wasPlaying) startSpeech(currentChunk);
+  });
+
+  function seekToWord(wordIdx) {
+    // Find which chunk contains this word
+    let ci = 0;
+    for (let i = 0; i < chunkStarts.length; i++) {
+      if (chunkStarts[i] <= wordIdx) ci = i;
+      else break;
+    }
+    currentChunk = ci;
+    const pct = (wordIdx / wordTokens.length) * 100;
+    progFill.style.width = pct + "%";
+    const rate = parseFloat(rateSlider.value);
+    elapsedSec = Math.round((wordIdx / wordTokens.length) * estDuration);
+    tElapsed.textContent = fmt(elapsedSec);
+  }
+
+  // Click on progress bar to seek
+  progBar.addEventListener("click", e => {
+    const pct = e.offsetX / progBar.offsetWidth;
+    const targetWord = Math.round(pct * wordTokens.length);
+    const wasPlaying = isPlaying;
+    stopSpeech();
+    seekToWord(targetWord);
+    if (wasPlaying) startSpeech(currentChunk);
+  });
+
+  // Rate
+  rateSlider.addEventListener("input", () => {
+    const r = parseFloat(rateSlider.value);
+    rateVal.textContent = r.toFixed(2) + "×";
+    const wordCount = wordTokens.length;
+    estDuration = Math.round(wordCount / (r * 200) * 60);
+    tTotal.textContent = fmt(estDuration);
+    if (utterance) utterance.rate = r;
+  });
+
+  // Voice change: restart current chunk
+  voiceSelect.addEventListener("change", () => {
+    if (isPlaying) {
+      stopSpeech();
+      startSpeech(currentChunk);
+    }
+  });
+
+  // ── Timer ─────────────────────────────────────────────────────────────────
+  let timerStartMs = null;
+  let elapsedAtPause = 0;
+
+  function resumeTimer() {
+    timerStartMs = Date.now();
+    clearInterval(timerID);
+    timerID = setInterval(() => {
+      elapsedSec = elapsedAtPause + (Date.now() - timerStartMs) / 1000;
+      tElapsed.textContent = fmt(Math.min(elapsedSec, estDuration));
+    }, 500);
+  }
+  function pauseTimer() {
+    elapsedAtPause = elapsedSec;
+    clearInterval(timerID);
+  }
+  function stopTimer() {
+    elapsedAtPause = 0;
+    elapsedSec = 0;
+    clearInterval(timerID);
+  }
+
+  // ── Highlight ──────────────────────────────────────────────────────────────
+  function highlightWord(idx) {
+    document.querySelectorAll(".word.active").forEach(el => el.classList.remove("active"));
+    if (idx < 0) return;
+    const el = scriptDisplay.querySelector(`[data-w="${idx}"]`);
+    if (el) {
+      el.classList.add("active");
+      el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  function fmt(sec) {
+    const s = Math.max(0, Math.round(sec));
+    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  }
+  function escHtml(s) {
+    return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+  }
+  function setStatus(msg, type = "") {
+    statusBar.textContent = msg;
+    statusBar.className = type;
+  }
+
+  // Copy script
+  copyBtn.addEventListener("click", async () => {
+    await navigator.clipboard.writeText(rawText);
+    copyBtn.textContent = "✅ Copied!";
+    setTimeout(() => { copyBtn.textContent = "📋 Copy text"; }, 2000);
+  });
+
+  // Safety: cancel speech when tab/window closes
+  window.addEventListener("beforeunload", () => speechSynthesis.cancel());
+</script>
+</body>
+</html>
