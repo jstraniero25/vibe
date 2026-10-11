@@ -1,0 +1,22 @@
+{
+  "name": "Race for Dottie",
+  "short_name": "Race for Dottie",
+  "description": "Live fantasy game center for Sleeper leagues",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#dfe2e6",
+  "theme_color": "#0b2d5c",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
