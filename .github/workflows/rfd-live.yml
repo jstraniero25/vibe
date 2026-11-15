@@ -1,0 +1,46 @@
+name: Race for Dottie live data
+
+# Pulls the league from Sleeper into live.json on the rfd-data branch, for the Master Dashboard.
+# Times are UTC (Eastern + 5 in winter): every 15 minutes while games are on, every 3 hours otherwise.
+on:
+  schedule:
+    - cron: '*/15 1-4 * * 5'   # Thursday night game
+    - cron: '*/15 17-23 * * 0' # Sunday afternoon
+    - cron: '*/15 0-4 * * 1'   # Sunday night game
+    - cron: '*/15 1-4 * * 2'   # Monday night game
+    - cron: '23 */3 * * *'     # standings, waivers and trades the rest of the week
+  push:
+    paths:
+      - '.github/rfd/**'
+      - '.github/workflows/rfd-live.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: rfd-live
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Pull the league from Sleeper
+        run: node .github/rfd/sync.mjs > live.json
+      - name: Publish live.json to the rfd-data branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir out && mv live.json out/ && cd out
+          git init -q -b rfd-data
+          git config user.name "rfd-sync"
+          git config user.email "rfd-sync@users.noreply.github.com"
+          git add live.json
+          git commit -qm "Live league data $(date -u +%FT%TZ)"
+          git push -fq "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" rfd-data
